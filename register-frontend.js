@@ -1,32 +1,33 @@
 // register-frontend.js
 (() => {
-    window.globalActiveCustomer = window.globalActiveCustomer || null;
-    window.globalActiveDiscount = window.globalActiveDiscount || 0;
-    
-    let currentCustomer = window.globalActiveCustomer;
-    let currentDiscountPercent = window.globalActiveDiscount;
-
-    // --- Set Active Cashier ---
+    // --- Global State ---
     const cashierNameEl = document.getElementById('current-cashier-name');
-    let activeUserId = 1; // Fallback just in case
+    let activeUserId = 1; 
 
     if (window.currentUser) {
         activeUserId = window.currentUser.id;
-        if (cashierNameEl) {
-            cashierNameEl.textContent = window.currentUser.first_name;
-        }
+        if (cashierNameEl) cashierNameEl.textContent = window.currentUser.first_name;
     }
 
-    // --- Global Cart Persistence (Plugs the refresh loophole!) ---
     window.globalActiveCart = window.globalActiveCart || [];
     window.globalParkedTickets = window.globalParkedTickets || [];
+    window.globalActiveCustomer = window.globalActiveCustomer || null;
+    window.globalActiveDiscount = window.globalActiveDiscount || 0;
     
-    // Bind our local variable to the global array
     let currentCart = window.globalActiveCart;
+    let currentCustomer = window.globalActiveCustomer;
+    let currentDiscountPercent = window.globalActiveDiscount;
+    
     let activeSubtotal = 0;
     let activeTax = 0;
     let activeTotal = 0;
+    let activeDiscountAmount = 0;
     const TAX_RATE = 0.07; 
+
+    let activeLoyaltyRedeemed = 0;
+    let activeGiftCardRedeemed = 0;
+    let activeGiftCardHash = null;
+    let remainingDue = 0;
 
     // UI Elements
     const cartList = document.getElementById('cart-items-list');
@@ -38,31 +39,195 @@
     const modal = document.getElementById('checkout-modal');
     const modalTotalDisplay = document.getElementById('modal-total-display');
 
-    // --- Scanner Logic & Manager Intercept ---
+    // --- Customer Attachment (Table UI) ---
+    const attachBtn = document.getElementById('btn-attach-customer');
+    const attachModal = document.getElementById('attach-customer-modal');
+    const searchInput = document.getElementById('attach-customer-search');
+    const resultsList = document.getElementById('attach-customer-results');
+
+    function updateCustomerUI() {
+        if (!attachBtn) return;
+        if (currentCustomer) {
+            attachBtn.innerHTML = `👤 ${currentCustomer.first_name} ($${currentCustomer.loyalty_balance.toFixed(2)}) <span id="remove-customer" style="color: #ff4444; margin-left: 8px;">✕</span>`;
+            document.getElementById('remove-customer').addEventListener('click', (e) => {
+                e.stopPropagation();
+                currentCustomer = null;
+                window.globalActiveCustomer = null;
+                activeLoyaltyRedeemed = 0; 
+                updateCustomerUI();
+            });
+        } else {
+            attachBtn.innerHTML = `👤 Attach Customer`;
+        }
+    }
+
+    if (attachBtn) {
+        attachBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            resultsList.innerHTML = '';
+            attachModal.classList.remove('hidden');
+            setTimeout(() => searchInput.focus(), 10);
+        });
+    }
+
+    if (document.getElementById('close-attach-customer-btn')) {
+        document.getElementById('close-attach-customer-btn').addEventListener('click', () => attachModal.classList.add('hidden'));
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', async (e) => {
+            const term = e.target.value;
+            if (term.length < 2) return;
+            const results = await window.api.searchCustomers(term);
+            resultsList.innerHTML = '';
+            results.forEach(cust => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${cust.first_name} ${cust.last_name}</strong></td>
+                    <td>${cust.phone || '-'}</td>
+                    <td style="text-align: right; color: #4CAF50;">$${cust.loyalty_balance.toFixed(2)}</td>
+                    <td style="text-align: center;"><button class="action-btn save-btn" style="padding: 5px 10px; font-size: 0.8rem;">Attach</button></td>
+                `;
+                tr.querySelector('button').addEventListener('click', () => {
+                    currentCustomer = cust;
+                    window.globalActiveCustomer = cust;
+                    updateCustomerUI();
+                    attachModal.classList.add('hidden');
+                });
+                resultsList.appendChild(tr);
+            });
+        });
+    }
+
+    // --- Quick Add Customer ---
+    const quickAddBtn = document.getElementById('btn-quick-add-cust');
+    const quickAddModal = document.getElementById('quick-add-modal');
+    if (quickAddBtn) {
+        quickAddBtn.addEventListener('click', () => {
+            document.getElementById('qa-first').value = '';
+            document.getElementById('qa-last').value = '';
+            document.getElementById('qa-phone').value = '';
+            quickAddModal.classList.remove('hidden');
+            setTimeout(() => document.getElementById('qa-first').focus(), 10);
+        });
+    }
+
+    if (document.getElementById('cancel-qa-btn')) document.getElementById('cancel-qa-btn').addEventListener('click', () => quickAddModal.classList.add('hidden'));
+    
+    if (document.getElementById('save-qa-btn')) {
+        document.getElementById('save-qa-btn').addEventListener('click', async () => {
+            const first = document.getElementById('qa-first').value.trim();
+            const last = document.getElementById('qa-last').value.trim();
+            const phone = document.getElementById('qa-phone').value.trim();
+            if(!first || !last || !phone) return alert("All fields required.");
+            
+            try {
+                const res = await window.api.saveCustomer({ first_name: first, last_name: last, phone: phone, email: '', loyalty_card_hash: '', loyalty_balance: 0 });
+                currentCustomer = { id: res.id, first_name: first, last_name: last, phone: phone, loyalty_balance: 0 };
+                window.globalActiveCustomer = currentCustomer;
+                updateCustomerUI();
+                quickAddModal.classList.add('hidden');
+                attachModal.classList.add('hidden');
+            } catch(e) { alert("Error saving customer. Phone might already exist."); }
+        });
+    }
+
+    // --- Sell Gift Card Item ---
+    const sellGcBtn = document.getElementById('btn-sell-gc');
+    const sellGcModal = document.getElementById('sell-gc-modal');
+    
+    if (sellGcBtn) {
+        sellGcBtn.addEventListener('click', () => {
+            document.getElementById('sell-gc-hash').value = '';
+            document.getElementById('sell-gc-amount').value = '';
+            sellGcModal.classList.remove('hidden');
+            setTimeout(() => document.getElementById('sell-gc-hash').focus(), 10);
+        });
+    }
+
+    if (document.getElementById('cancel-sell-gc-btn')) document.getElementById('cancel-sell-gc-btn').addEventListener('click', () => sellGcModal.classList.add('hidden'));
+
+    if (document.getElementById('confirm-sell-gc-btn')) {
+        document.getElementById('confirm-sell-gc-btn').addEventListener('click', () => {
+            const hash = document.getElementById('sell-gc-hash').value.trim();
+            const amt = parseFloat(document.getElementById('sell-gc-amount').value);
+            
+            if (!hash || isNaN(amt) || amt <= 0) return alert("Valid swipe and amount required.");
+            
+            // Push it into the cart as a special un-taxable item!
+            currentCart.push({
+                id: 'GC-' + Date.now(),
+                name: `Gift Card Load (${hash.substring(0,4)}...)`,
+                price: amt,
+                isGiftCard: true,
+                gcHash: hash
+            });
+            
+            updateCartUI();
+            sellGcModal.classList.add('hidden');
+            lastScannedMsg.textContent = "Gift Card loaded to cart.";
+            lastScannedMsg.style.color = "#E91E63";
+        });
+    }
+
+    // --- Discount Logic ---
+    const discountBtn = document.getElementById('btn-discount');
+    const discountModal = document.getElementById('discount-modal');
+    const discountInput = document.getElementById('discount-input');
+
+    if (discountBtn) {
+        discountBtn.addEventListener('click', () => {
+            discountInput.value = '';
+            discountModal.classList.remove('hidden');
+            setTimeout(() => discountInput.focus(), 10);
+        });
+    }
+
+    if (document.getElementById('cancel-discount-btn')) document.getElementById('cancel-discount-btn').addEventListener('click', () => discountModal.classList.add('hidden'));
+
+    if (document.getElementById('apply-discount-btn')) {
+        document.getElementById('apply-discount-btn').addEventListener('click', () => {
+            const val = parseFloat(discountInput.value);
+            if (!isNaN(val) && val >= 0 && val <= 100) {
+                currentDiscountPercent = val;
+                window.globalActiveDiscount = val;
+                updateCartUI();
+            }
+            discountModal.classList.add('hidden');
+        });
+    }
+
+    // --- Scanner Logic ---
     let barcodeBuffer = "";
     let lastKeyTime = Date.now();
     const overrideModal = document.getElementById('override-modal');
 
     const handleKeydown = (e) => {
-        // SELF-CLEANING: If the register was closed, destroy this listener!
         if (!document.getElementById('register-applet')) {
             document.removeEventListener('keydown', handleKeydown);
             return;
         }
-        
+
         const currentTime = Date.now();
         if (currentTime - lastKeyTime > 50) barcodeBuffer = ""; 
         
         if (e.key === 'Enter' && barcodeBuffer.length > 3) {
             e.preventDefault(); 
             
-            // NEW: Check if we are waiting for a manager swipe
-            if (!overrideModal.classList.contains('hidden')) {
+            const gcModal = document.getElementById('gc-checkout-modal');
+            const sellGcModalOpen = document.getElementById('sell-gc-modal');
+
+            if (gcModal && !gcModal.classList.contains('hidden')) {
+                document.getElementById('gc-swipe-input').value = barcodeBuffer;
+                document.getElementById('apply-gc-pay-btn').click();
+            } else if (sellGcModalOpen && !sellGcModalOpen.classList.contains('hidden')) {
+                document.getElementById('sell-gc-hash').value = barcodeBuffer;
+                document.getElementById('sell-gc-amount').focus();
+            } else if (overrideModal && !overrideModal.classList.contains('hidden')) {
                 attemptOverride(barcodeBuffer);
             } else {
-                processBarcode(barcodeBuffer); // Normal item scan
+                processBarcode(barcodeBuffer); 
             }
-            
             barcodeBuffer = "";
         } else if (e.key !== 'Enter') {
             barcodeBuffer += e.key;
@@ -70,13 +235,11 @@
         lastKeyTime = currentTime;
     };
     
-    // Attach listener to document
     document.addEventListener('keydown', handleKeydown);
 
-    // --- Manual Entry & Touch Keypad Logic ---
+    // --- Keypad Logic ---
     const manualInput = document.getElementById('manual-barcode-input');
     
-    // 1. Handle Number Pad Taps
     document.querySelectorAll('.num-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             manualInput.value += e.target.textContent;
@@ -84,13 +247,11 @@
         });
     });
 
-    // 2. Clear Button
     document.getElementById('btn-clear').addEventListener('click', () => {
         manualInput.value = "";
         manualInput.focus();
     });
 
-    // 3. Physical Keyboard "Enter" Support
     manualInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -101,7 +262,6 @@
         }
     });
 
-    // 4. On-Screen "ENTER" Button
     document.getElementById('manual-add-btn').addEventListener('click', () => {
         if (manualInput.value) {
             processBarcode(manualInput.value);
@@ -109,7 +269,7 @@
         }
     });
 
-    // --- Security & Action Execution ---
+    // --- Security / Override ---
     let pendingOverrideAction = null;
 
     function executeVoid() {
@@ -118,9 +278,7 @@
             updateCartUI();
             lastScannedMsg.textContent = `Voided: ${removedItem.name}`;
             lastScannedMsg.style.color = "#E53935";
-        } else {
-            alert("Cart is empty.");
-        }
+        } else alert("Cart is empty.");
     }
 
     function executeNoSale() {
@@ -129,7 +287,6 @@
         lastScannedMsg.style.color = "#9E9E9E";
     }
 
-    // --- Manager Override Modal Logic ---
     let overridePinInput = "";
     const overridePinDisplay = document.getElementById('override-pin-display');
     const overrideMsg = document.getElementById('override-msg');
@@ -149,9 +306,8 @@
         overridePinInput = "";
     }
 
-    document.getElementById('cancel-override-btn').addEventListener('click', closeOverrideModal);
+    if (document.getElementById('cancel-override-btn')) document.getElementById('cancel-override-btn').addEventListener('click', closeOverrideModal);
 
-    // Override PIN Pad Clicks
     document.querySelectorAll('.override-pin-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const val = e.target.textContent;
@@ -162,41 +318,26 @@
         });
     });
 
-    document.getElementById('override-pin-clear').addEventListener('click', () => {
-        overridePinInput = "";
-        overridePinDisplay.textContent = "";
-    });
+    if (document.getElementById('override-pin-enter')) document.getElementById('override-pin-enter').addEventListener('click', () => attemptOverride(overridePinInput));
 
-    document.getElementById('override-pin-enter').addEventListener('click', () => {
-        attemptOverride(overridePinInput);
-    });
-
-    // Database Check
     async function attemptOverride(credential) {
         if (!credential) return;
-        
         try {
             overrideMsg.textContent = "Verifying...";
             const manager = await window.api.loginEmployee(credential);
             
             if (manager) {
-                // Verify this specific manager has the right permission!
                 let hasPermission = false;
                 if (pendingOverrideAction === 'void' && manager.can_void_transactions) hasPermission = true;
                 if (pendingOverrideAction === 'no_sale' && manager.can_open_drawer) hasPermission = true;
 
                 if (hasPermission) {
-                    // 1. Save the action we want to run into a safe temporary variable
                     const actionToRun = pendingOverrideAction; 
-                    
-                    // 2. Now it is safe to close and reset the modal
                     closeOverrideModal(); 
-                    
-                    // 3. Execute the saved action!
                     if (actionToRun === 'void') executeVoid();
                     if (actionToRun === 'no_sale') executeNoSale();
                 } else {
-                    overrideMsg.textContent = "User lacks required permissions.";
+                    overrideMsg.textContent = "User lacks permissions.";
                     overrideMsg.style.color = "#E53935";
                     overridePinInput = "";
                     overridePinDisplay.textContent = "";
@@ -207,67 +348,31 @@
                 overridePinInput = "";
                 overridePinDisplay.textContent = "";
             }
-        } catch (error) {
-            console.error(error);
-            overrideMsg.textContent = "System Error.";
-        }
+        } catch (error) { console.error(error); }
     }
 
-    // 5. VOID Button
     document.getElementById('btn-void').addEventListener('click', () => {
-        if (window.currentUser.can_void_transactions) {
-            executeVoid();
-        } else {
-            openOverrideModal('void');
-        }
+        if (window.currentUser.can_void_transactions) executeVoid();
+        else openOverrideModal('void');
     });
 
-    // 6. NO SALE Button
     document.getElementById('btn-no-sale').addEventListener('click', () => {
-        if (window.currentUser.can_open_drawer) {
-            executeNoSale();
-        } else {
-            openOverrideModal('no_sale');
-        }
+        if (window.currentUser.can_open_drawer) executeNoSale();
+        else openOverrideModal('no_sale');
     });
 
-    // 7. QTY Button (Multiplies the last scanned item)
     document.getElementById('btn-qty').addEventListener('click', () => {
         const qtyValue = parseInt(manualInput.value);
-        
-        if (isNaN(qtyValue) || qtyValue <= 0) {
-            alert("Please enter a valid quantity, then press QTY.");
-            return;
-        }
+        if (isNaN(qtyValue) || qtyValue <= 0) return alert("Enter valid quantity, then press QTY.");
+        if (currentCart.length === 0) return alert("Scan an item first.");
 
-        if (currentCart.length === 0) {
-            alert("Scan an item first before changing quantity.");
-            return;
-        }
-
-        // We already have 1 in the cart, so add (qtyValue - 1) more copies
         const lastItem = currentCart[currentCart.length - 1];
-        for (let i = 0; i < qtyValue - 1; i++) {
-            currentCart.push(lastItem);
-        }
+        for (let i = 0; i < qtyValue - 1; i++) currentCart.push(lastItem);
 
         updateCartUI();
         manualInput.value = "";
         lastScannedMsg.textContent = `Quantity updated to ${qtyValue}x for ${lastItem.name}`;
         lastScannedMsg.style.color = "#FFD54F";
-    });
-
-    // 8. NO SALE Button (Pops the drawer)
-    document.getElementById('btn-no-sale').addEventListener('click', () => {
-        if (!window.currentUser.can_open_drawer) {
-            alert("You do not have permission to open the drawer.");
-            return;
-        }
-        
-        // Future: Send silent print command with drawer kick hex code here!
-        alert("Drawer Opened (No Sale).");
-        lastScannedMsg.textContent = "No Sale Processed.";
-        lastScannedMsg.style.color = "#9E9E9E";
     });
 
     // --- DB Call & Cart ---
@@ -283,225 +388,251 @@
                 lastScannedMsg.textContent = `Error: Item not found`;
                 lastScannedMsg.style.color = "#E53935";
             }
-        } catch (error) {
-            console.error(error);
-        }
+        } catch (error) { console.error(error); }
     }
 
     function updateCartUI() {
         cartList.innerHTML = '';
         activeSubtotal = 0;
+        
+        // Split math for GC tax exemptions
+        let taxableSubtotal = 0;
+        let nonTaxableSubtotal = 0;
 
-        // 1. Group the items by ID
         const groupedItems = {};
-
         currentCart.forEach((item) => {
-            activeSubtotal += item.price; // Keep a running subtotal
+            activeSubtotal += item.price; 
             
+            if (item.isGiftCard) nonTaxableSubtotal += item.price;
+            else taxableSubtotal += item.price;
+
             if (groupedItems[item.id]) {
                 groupedItems[item.id].qty += 1;
                 groupedItems[item.id].totalPrice += item.price;
             } else {
-                groupedItems[item.id] = {
-                    name: item.name,
-                    price: item.price,
-                    qty: 1,
-                    totalPrice: item.price
-                };
+                groupedItems[item.id] = { name: item.name, price: item.price, qty: 1, totalPrice: item.price };
             }
         });
 
-        // 2. Rebuild the visual list from the grouped object
         Object.values(groupedItems).forEach((group) => {
             const li = document.createElement('li');
             li.className = 'cart-item';
-            
-            // If there's more than 1, add a bold green multiplier next to the name
             const displayName = group.qty > 1 
                 ? `${group.name} <span style="color: #4CAF50; font-weight: bold; margin-left: 8px;">x${group.qty}</span>` 
                 : group.name;
-            
             li.innerHTML = `<span>${displayName}</span> <span>$${group.totalPrice.toFixed(2)}</span>`;
             cartList.appendChild(li);
         });
 
-        // 3. Do the final math
-        activeTax = activeSubtotal * TAX_RATE;
-        activeTotal = activeSubtotal + activeTax;
+        // Calculate Tax & Discounts (Gift Cards are exempt from both!)
+        activeDiscountAmount = taxableSubtotal * (currentDiscountPercent / 100);
+        const discountedTaxable = taxableSubtotal - activeDiscountAmount;
+        
+        activeTax = discountedTaxable * TAX_RATE;
+        activeTotal = discountedTaxable + nonTaxableSubtotal + activeTax;
 
-        subtotalEl.textContent = `$${activeSubtotal.toFixed(2)}`;
+        if (currentDiscountPercent > 0) {
+            subtotalEl.innerHTML = `<s>$${activeSubtotal.toFixed(2)}</s> <span style="color:#FF9800;">(-${currentDiscountPercent}%)</span> $${(discountedTaxable + nonTaxableSubtotal).toFixed(2)}`;
+        } else {
+            subtotalEl.textContent = `$${activeSubtotal.toFixed(2)}`;
+        }
+        
         taxEl.textContent = `$${activeTax.toFixed(2)}`;
         totalEl.textContent = `$${activeTotal.toFixed(2)}`;
 
+        if (currentCart.length === 0) {
+            activeLoyaltyRedeemed = 0;
+            activeGiftCardRedeemed = 0;
+            activeGiftCardHash = null;
+        }
+
         checkoutBtn.disabled = currentCart.length === 0;
+        if (!modal.classList.contains('hidden')) updateCheckoutDisplay(); 
     }
 
     // --- Checkout Logic ---
     const cashModal = document.getElementById('cash-modal');
     const cashAmountInput = document.getElementById('cash-amount-input');
     const cashTotalDisplay = document.getElementById('cash-total-display');
-    
     const changeModal = document.getElementById('change-modal');
     const changeDueDisplay = document.getElementById('change-due-display');
+    
+    function updateCheckoutDisplay() {
+        remainingDue = activeTotal - activeLoyaltyRedeemed - activeGiftCardRedeemed;
+        if (remainingDue < 0) remainingDue = 0;
+        
+        let displayHTML = `Total: $${activeTotal.toFixed(2)}`;
+        if (activeLoyaltyRedeemed > 0) displayHTML += `<br><span style="color:#E91E63; font-size:1.2rem;">- Points: $${activeLoyaltyRedeemed.toFixed(2)}</span>`;
+        if (activeGiftCardRedeemed > 0) displayHTML += `<br><span style="color:#9C27B0; font-size:1.2rem;">- Gift Card: $${activeGiftCardRedeemed.toFixed(2)}</span>`;
+        displayHTML += `<br><strong style="color:#4CAF50; font-size:1.8rem;">Due: $${remainingDue.toFixed(2)}</strong>`;
+        
+        modalTotalDisplay.innerHTML = displayHTML;
+        
+        const pointsBtn = document.getElementById('btn-pay-points');
+        if (pointsBtn) {
+            if (currentCustomer && currentCustomer.loyalty_balance > 0 && remainingDue > 0) {
+                pointsBtn.style.display = 'block';
+                pointsBtn.textContent = `Pay with Points ($${currentCustomer.loyalty_balance.toFixed(2)})`;
+            } else {
+                pointsBtn.style.display = 'none';
+            }
+        }
+    }
 
-    let pendingTenderType = "";
-
-    // Open Main Checkout Modal
     checkoutBtn.addEventListener('click', () => {
-        modalTotalDisplay.textContent = totalEl.textContent;
+        updateCheckoutDisplay();
         modal.classList.remove('hidden');
     });
 
-    document.getElementById('cancel-checkout-btn').addEventListener('click', () => {
-        modal.classList.add('hidden');
-    });
+    document.getElementById('cancel-checkout-btn').addEventListener('click', () => modal.classList.add('hidden'));
 
-    // Handle Tender Selection
+    // Split: Pay with Points
+    const pointsBtn = document.getElementById('btn-pay-points');
+    if (pointsBtn) {
+        pointsBtn.addEventListener('click', () => {
+            if (!currentCustomer || remainingDue <= 0) return;
+            let available = currentCustomer.loyalty_balance - activeLoyaltyRedeemed; 
+            if (available <= 0) return;
+            let amountToDeduct = remainingDue;
+            if (available < remainingDue) amountToDeduct = available; 
+            
+            activeLoyaltyRedeemed += amountToDeduct;
+            updateCheckoutDisplay();
+            if (remainingDue <= 0) finalizeSale('Loyalty Points', activeTotal, 0);
+        });
+    }
+
+    // Split: Pay with Gift Card
+    const gcBtn = document.getElementById('btn-pay-giftcard');
+    const gcModal = document.getElementById('gc-checkout-modal');
+    const gcInput = document.getElementById('gc-swipe-input');
+
+    if (gcBtn) {
+        gcBtn.addEventListener('click', () => {
+            if (remainingDue <= 0) return;
+            document.getElementById('gc-remaining-display').textContent = `Remaining Due: $${remainingDue.toFixed(2)}`;
+            gcInput.value = '';
+            gcModal.classList.remove('hidden');
+            setTimeout(() => gcInput.focus(), 10);
+        });
+    }
+
+    if (document.getElementById('cancel-gc-pay-btn')) document.getElementById('cancel-gc-pay-btn').addEventListener('click', () => gcModal.classList.add('hidden'));
+
+    if (document.getElementById('apply-gc-pay-btn')) {
+        document.getElementById('apply-gc-pay-btn').addEventListener('click', async () => {
+            const hash = gcInput.value;
+            if (!hash) return;
+            try {
+                const gc = await window.api.checkGiftCard(hash);
+                if (!gc || gc.balance <= 0) return alert("Invalid or empty Gift Card.");
+                let amountToDeduct = remainingDue;
+                if (gc.balance < remainingDue) amountToDeduct = gc.balance; 
+                
+                activeGiftCardRedeemed += amountToDeduct;
+                activeGiftCardHash = hash;
+                gcModal.classList.add('hidden');
+                updateCheckoutDisplay();
+                if (remainingDue <= 0) finalizeSale('Gift Card', activeTotal, 0);
+            } catch (e) { alert("Error checking gift card."); }
+        });
+    }
+
+    // Final Tender Selection
+    let pendingTenderType = "";
     document.querySelectorAll('.tender-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            pendingTenderType = e.target.getAttribute('data-tender');
+            if (remainingDue <= 0) return; 
+            
+            pendingTenderType = e.currentTarget.getAttribute('data-tender');
+            if (!pendingTenderType) return;
             
             if (pendingTenderType === 'Cash') {
-                // Hide main modal, show cash input modal
                 modal.classList.add('hidden');
-                cashTotalDisplay.textContent = `Due: $${activeTotal.toFixed(2)}`;
+                cashTotalDisplay.textContent = `Due: $${remainingDue.toFixed(2)}`;
                 cashAmountInput.value = '';
                 cashModal.classList.remove('hidden');
-                cashAmountInput.focus();
+                setTimeout(() => cashAmountInput.focus(), 10);
             } else {
-                // Process non-cash immediately (exact amount)
-                finalizeSale(pendingTenderType, activeTotal, 0);
+                finalizeSale(pendingTenderType, remainingDue, 0);
             }
         });
     });
 
-    // Handle Cash Confirm
+    // --- NEW: Cash Modal Numpad Logic ---
+    document.querySelectorAll('.cash-num-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const val = e.target.textContent;
+            if (val === 'Exact') {
+                cashAmountInput.value = remainingDue.toFixed(2);
+            } else {
+                cashAmountInput.value += val;
+            }
+            cashAmountInput.focus();
+        });
+    });
+
+    document.querySelector('.cash-btn-clear').addEventListener('click', () => {
+        cashAmountInput.value = "";
+        cashAmountInput.focus();
+    });
+
     document.getElementById('confirm-cash-btn').addEventListener('click', () => {
         const amountTendered = parseFloat(cashAmountInput.value);
+        if (isNaN(amountTendered) || amountTendered < remainingDue) return alert("Not enough cash provided!");
         
-        if (isNaN(amountTendered) || amountTendered < activeTotal) {
-            alert("Not enough cash provided! Please enter a valid amount.");
-            return;
-        }
-        
-        const changeDue = amountTendered - activeTotal;
+        const changeDue = amountTendered - remainingDue;
         cashModal.classList.add('hidden');
         finalizeSale('Cash', amountTendered, changeDue);
     });
 
-    // Handle Cash Cancel (Go back to tender select)
     document.getElementById('cancel-cash-btn').addEventListener('click', () => {
         cashModal.classList.add('hidden');
         modal.classList.remove('hidden'); 
     });
 
-    // --- Open Tickets Logic ---
-    const parkBtn = document.getElementById('btn-park-ticket');
-    const recallBtn = document.getElementById('btn-recall-ticket');
-    const recallModal = document.getElementById('recall-modal');
-    const openTicketCount = document.getElementById('open-ticket-count');
-    const recallTableBody = document.getElementById('recall-table-body');
-
-    function updateTicketCount() {
-        if (openTicketCount) {
-            openTicketCount.textContent = window.globalParkedTickets.length;
-        }
-    }
-
-    // 1. Park the Active Order
-    if (parkBtn) {
-        parkBtn.addEventListener('click', () => {
-            if (currentCart.length === 0) {
-                alert("Cart is already empty.");
-                return;
-            }
-
-            // Save a copy of the active cart to the global parked array
-            window.globalParkedTickets.push({
-                id: Date.now(),
-                timestamp: new Date().toLocaleTimeString(),
-                cartData: [...currentCart] // Deep copy the array
-            });
-
-            // Empty the active cart (but keep the global reference intact)
-            currentCart.length = 0; 
-            updateCartUI();
-            updateTicketCount();
-            
-            lastScannedMsg.textContent = "Order Parked.";
-            lastScannedMsg.style.color = "#FF9800";
-        });
-    }
-
-    // 2. Open the Recall Modal
-    if (recallBtn) {
-        recallBtn.addEventListener('click', () => {
-            recallTableBody.innerHTML = '';
-
-            if (window.globalParkedTickets.length === 0) {
-                recallTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #888; padding: 20px;">No open tickets.</td></tr>';
-            } else {
-                window.globalParkedTickets.forEach((ticket, index) => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${ticket.timestamp}</td>
-                        <td>${ticket.cartData.length} items</td>
-                        <td><button class="action-btn recall-action-btn" data-index="${index}" style="background: #4CAF50; padding: 5px 15px; font-size: 0.9rem;">Resume</button></td>
-                    `;
-                    recallTableBody.appendChild(tr);
-                });
-
-                // Attach click listeners to the dynamically created Resume buttons
-                document.querySelectorAll('.recall-action-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        if (currentCart.length > 0) {
-                            alert("Please park or finish the current active order before recalling another.");
-                            return;
-                        }
-
-                        const indexToRecall = e.target.getAttribute('data-index');
-                        const ticketToResume = window.globalParkedTickets.splice(indexToRecall, 1)[0]; // Remove from parked list
-                        
-                        // Push all items back into the active cart
-                        ticketToResume.cartData.forEach(item => currentCart.push(item));
-                        
-                        updateCartUI();
-                        updateTicketCount();
-                        recallModal.classList.add('hidden');
-                        
-                        lastScannedMsg.textContent = "Order Resumed.";
-                        lastScannedMsg.style.color = "#4CAF50";
-                    });
-                });
-            }
-
-            recallModal.classList.remove('hidden');
-        });
-    }
-
-    document.getElementById('close-recall-btn').addEventListener('click', () => {
-        recallModal.classList.add('hidden');
-    });
-
-    // The Final Database Call
+    // --- The Final Database Call ---
     async function finalizeSale(tenderType, amountTendered, changeDue) {
+        // Calculate loyalty points earned 
+        // Note: Do not award points ON the purchase of a gift card, only regular items
+        let loyaltyEligibleTotal = 0;
+        currentCart.forEach(item => { if (!item.isGiftCard) loyaltyEligibleTotal += item.price; });
+        const loyaltyEarned = currentCustomer ? (loyaltyEligibleTotal * 0.05) : 0;
+        
+        let finalTenderType = tenderType;
+        if ((activeLoyaltyRedeemed > 0 || activeGiftCardRedeemed > 0) && tenderType !== 'Loyalty Points' && tenderType !== 'Gift Card') {
+            finalTenderType = `Split (${tenderType})`;
+        }
+
         const orderData = {
             userId: activeUserId, 
+            customerId: currentCustomer ? currentCustomer.id : null,
             subtotal: activeSubtotal,
+            discountAmount: activeDiscountAmount,
             tax: activeTax,
             total: activeTotal,
-            tenderType: tenderType,
+            loyaltyEarned: loyaltyEarned,
+            loyaltyRedeemed: activeLoyaltyRedeemed,
+            giftCardRedeemed: activeGiftCardRedeemed,
+            giftCardHash: activeGiftCardHash,
+            tenderType: finalTenderType,
             amountTendered: amountTendered,
             changeDue: changeDue,
             cart: currentCart
         };
 
         try {
-            // 1. Send to backend and get the new Ticket ID back
             const response = await window.api.processCheckout(orderData);
             const newTicketId = response.ticketId;
             
-            // 2. Populate the Digital Receipt
+            // ACTIVATE ANY SOLD GIFT CARDS
+            for (let item of currentCart) {
+                if (item.isGiftCard) {
+                    await window.api.issueGiftCard(item.gcHash, item.price, null);
+                }
+            }
+
+            // Populate Receipt
             document.getElementById('receipt-date').textContent = new Date().toLocaleString();
             document.getElementById('receipt-ticket-id').textContent = newTicketId.toString().padStart(6, '0');
             document.getElementById('receipt-cashier-name').textContent = window.currentUser ? window.currentUser.first_name : 'System';
@@ -509,7 +640,6 @@
             const receiptItems = document.getElementById('receipt-items');
             receiptItems.innerHTML = '';
             
-            // Group items for the printed receipt
             const receiptGrouped = {};
             currentCart.forEach(item => {
                 if(receiptGrouped[item.id]) {
@@ -520,7 +650,6 @@
                 }
             });
 
-            // Inject the grouped items into the receipt table
             Object.values(receiptGrouped).forEach(group => {
                 const displayName = group.qty > 1 ? `${group.name} x${group.qty}` : group.name;
                 receiptItems.innerHTML += `<tr><td style="padding-bottom: 5px;">${displayName}</td><td style="text-align: right; padding-bottom: 5px;">$${group.totalPrice.toFixed(2)}</td></tr>`;
@@ -529,155 +658,57 @@
             document.getElementById('receipt-subtotal').textContent = `$${activeSubtotal.toFixed(2)}`;
             document.getElementById('receipt-tax').textContent = `$${activeTax.toFixed(2)}`;
             document.getElementById('receipt-total').textContent = `$${activeTotal.toFixed(2)}`;
-            document.getElementById('receipt-tender-type').textContent = tenderType;
+            document.getElementById('receipt-tender-type').textContent = finalTenderType;
             document.getElementById('receipt-tender-amount').textContent = `$${amountTendered.toFixed(2)}`;
             document.getElementById('receipt-change-due').textContent = `$${changeDue.toFixed(2)}`;
 
-            // 3. Reset Register UI
-            currentCart = [];
+            // Reset Everything
+            currentCart.length = 0;
+            currentCustomer = null;
+            currentDiscountPercent = 0;
+            activeLoyaltyRedeemed = 0;
+            activeGiftCardRedeemed = 0;
+            activeGiftCardHash = null;
+            window.globalActiveCustomer = null;
+            window.globalActiveDiscount = 0;
+            
+            updateCustomerUI();
             updateCartUI();
+            
             modal.classList.add('hidden');
             lastScannedMsg.textContent = "Ready for next customer...";
             lastScannedMsg.style.color = "#fff";
 
-            // 4. Determine which modal to show next
             if (tenderType === 'Cash') {
-                // For cash, always show the huge change due screen first!
                 changeDueDisplay.textContent = `$${changeDue.toFixed(2)}`;
                 changeModal.classList.remove('hidden');
             } else {
-                // For cards, skip change and go straight to the receipt
                 document.getElementById('receipt-modal').classList.remove('hidden');
             }
 
         } catch (error) {
-            console.error("Database error processing transaction:", error);
+            console.error(error);
             alert("Database error processing transaction.");
         }
     }
 
-    // Close Change Modal
-    document.getElementById('close-change-btn').addEventListener('click', () => {
-        changeModal.classList.add('hidden');
-    });
+    if (document.getElementById('close-change-btn')) {
+        document.getElementById('close-change-btn').addEventListener('click', () => {
+            changeModal.classList.add('hidden');
+            document.getElementById('receipt-modal').classList.remove('hidden');
+        });
+    }
 
-    // Clean up scanner listener when closing applet
     const closeBtn = document.getElementById('close-register-btn');
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
             document.removeEventListener('keydown', handleKeydown);
-            renderHomeDashboard();
+            renderHomeDashboard(); 
         });
     }
 
-    // When closing the huge Cash Change modal, immediately pop up the Receipt Modal
-    document.getElementById('close-change-btn').addEventListener('click', () => {
-        changeModal.classList.add('hidden');
-        document.getElementById('receipt-modal').classList.remove('hidden');
-    });
+    if (document.getElementById('close-receipt-btn')) document.getElementById('close-receipt-btn').addEventListener('click', () => document.getElementById('receipt-modal').classList.add('hidden'));
 
-    // Close the Receipt Modal and prep for the next customer
-    document.getElementById('close-receipt-btn').addEventListener('click', () => {
-        document.getElementById('receipt-modal').classList.add('hidden');
-    });
-
-    // Fire the silent print bridge
-    document.getElementById('print-receipt-btn').addEventListener('click', async () => {
-        // 1. Grab just the HTML inside the receipt area
-        const receiptContent = document.getElementById('printable-receipt-area').innerHTML;
-        
-        try {
-            // 2. Send it to the ghost window!
-            await window.api.printReceipt(receiptContent);
-            
-            // 3. Close the modal and prep for the next customer
-            document.getElementById('receipt-modal').classList.add('hidden');
-        } catch (error) {
-            console.error("Print failed:", error);
-            alert("Printer error. Check connection.");
-        }
-    });
-
-    // --- Customer Attachment Logic ---
-    const attachBtn = document.getElementById('btn-attach-customer');
-    const attachModal = document.getElementById('attach-customer-modal');
-    const searchInput = document.getElementById('attach-customer-search');
-    const resultsList = document.getElementById('attach-customer-results');
-
-    function updateCustomerUI() {
-        if (currentCustomer) {
-            attachBtn.innerHTML = `👤 ${currentCustomer.first_name} ($${currentCustomer.loyalty_balance.toFixed(2)}) <span id="remove-customer" style="color: #ff4444; margin-left: 8px;">✕</span>`;
-            document.getElementById('remove-customer').addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent opening modal
-                currentCustomer = null;
-                window.globalActiveCustomer = null;
-                updateCustomerUI();
-            });
-        } else {
-            attachBtn.innerHTML = `👤 Attach Customer`;
-        }
-    }
-
-    if (attachBtn) {
-        attachBtn.addEventListener('click', () => {
-            searchInput.value = '';
-            resultsList.innerHTML = '';
-            attachModal.classList.remove('hidden');
-            setTimeout(() => {
-                searchInput.focus();
-             }, 10); // Focus after modal animation
-        });
-    }
-
-    document.getElementById('close-attach-customer-btn').addEventListener('click', () => attachModal.classList.add('hidden'));
-
-    searchInput.addEventListener('input', async (e) => {
-        const term = e.target.value;
-        if (term.length < 2) return;
-        
-        const results = await window.api.searchCustomers(term);
-        resultsList.innerHTML = '';
-        
-        results.forEach(cust => {
-            const li = document.createElement('li');
-            li.style.cursor = 'pointer';
-            li.innerHTML = `<strong>${cust.first_name} ${cust.last_name}</strong> - ${cust.phone || 'No Phone'} <span style="float: right; color: #4CAF50;">$${cust.loyalty_balance.toFixed(2)}</span>`;
-            li.addEventListener('click', () => {
-                currentCustomer = cust;
-                window.globalActiveCustomer = cust;
-                updateCustomerUI();
-                attachModal.classList.add('hidden');
-            });
-            resultsList.appendChild(li);
-        });
-    });
-
-    // --- Discount Logic ---
-    document.getElementById('btn-discount').addEventListener('click', () => {
-        document.getElementById('discount-input').value = '';
-        document.getElementById('discount-modal').classList.remove('hidden');
-        
-        // FIX: Give Chromium 10ms to paint the modal before focusing!
-        setTimeout(() => {
-            document.getElementById('discount-input').focus();
-        }, 10);
-    });
-
-    document.getElementById('cancel-discount-btn').addEventListener('click', () => {
-        document.getElementById('discount-modal').classList.add('hidden');
-    });
-
-    document.getElementById('apply-discount-btn').addEventListener('click', () => {
-        const val = parseFloat(document.getElementById('discount-input').value);
-        if (!isNaN(val) && val > 0 && val <= 100) {
-            currentDiscountPercent = val;
-            window.globalActiveDiscount = val;
-            updateCartUI();
-        }
-        document.getElementById('discount-modal').classList.add('hidden');
-    });
-
-    //Finally, run the initial UI update to set everything in the correct state on load
+    updateCustomerUI();
     updateCartUI();
-    updateTicketCount();
 })();

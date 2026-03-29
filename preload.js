@@ -32,4 +32,7 @@ contextBridge.exposeInMainWorld('api', {
     saveCustomer: (customerData) => ipcRenderer.invoke('save-customer', customerData),
     deleteCustomer: (customerId) => ipcRenderer.invoke('delete-customer', customerId),
     searchCustomers: (searchTerm) => ipcRenderer.invoke('search-customers', searchTerm),
+    // Gift Cards
+    checkGiftCard: (hash) => ipcRenderer.invoke('check-gift-card', hash),
+    issueGiftCard: (hash, amount, customerId) => ipcRenderer.invoke('issue-gift-card', { hash, amount, customerId }),
 });

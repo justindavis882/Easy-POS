@@ -162,29 +162,21 @@ ipcMain.handle('process-checkout', (event, orderData) => {
                     db.run(`UPDATE Customers SET loyalty_balance = loyalty_balance + ? WHERE id = ?`, 
                         [orderData.loyaltyEarned, orderData.customerId]);
                 }
+
                 let itemsProcessed = 0;
                 
-                // 2. Save the items and deduct inventory
-                orderData.cart.forEach(item => {
-                    db.run(
-                        `INSERT INTO Ticket_Lines (ticket_id, item_id, qty, price_at_sale) VALUES (?, ?, ?, ?)`,
-                        [ticketId, item.id, 1, item.price], 
-                        (lineErr) => {
-                            if (lineErr) console.error("Ticket Line Error:", lineErr);
-                            
-                            // Deduct the item from stock!
-                            db.run(`UPDATE Items SET stock_qty = stock_qty - 1 WHERE id = ?`, [item.id], (invErr) => {
-                                if (invErr) console.error("Inventory Deduction Error:", invErr);
-                                
-                                itemsProcessed++;
-                                // Once all items are processed, tell the frontend it's done
-                                if (itemsProcessed === orderData.cart.length) {
-                                    resolve({ success: true, ticketId: ticketId });
-                                }
-                            });
-                        }
-                    );
-                });
+                // 2. Handle Loyalty Earned
+                if (orderData.customerId && orderData.loyaltyEarned > 0) {
+                    db.run(`UPDATE Customers SET loyalty_balance = loyalty_balance + ? WHERE id = ?`, [orderData.loyaltyEarned, orderData.customerId]);
+                }
+                
+                // 3. Handle Balances Redeemed (Spent)
+                if (orderData.customerId && orderData.loyaltyRedeemed > 0) {
+                    db.run(`UPDATE Customers SET loyalty_balance = loyalty_balance - ? WHERE id = ?`, [orderData.loyaltyRedeemed, orderData.customerId]);
+                }
+                if (orderData.giftCardHash && orderData.giftCardRedeemed > 0) {
+                    db.run(`UPDATE GiftCards SET balance = balance - ? WHERE card_hash = ?`, [orderData.giftCardRedeemed, orderData.giftCardHash]);
+                }
             }
         );
     });
@@ -332,5 +324,32 @@ ipcMain.handle('search-customers', (event, term) => {
         db.all(query, [wildTerm, wildTerm, wildTerm, term], (err, rows) => {
             if (err) reject(err); else resolve(rows);
         });
+    });
+});
+
+// --- GIFT CARD HANDLERS ---
+ipcMain.handle('check-gift-card', (event, hash) => {
+    return new Promise((resolve, reject) => {
+        db.get(`SELECT * FROM GiftCards WHERE card_hash = ?`, [hash], (err, row) => {
+            if (err) reject(err); else resolve(row);
+        });
+    });
+});
+
+ipcMain.handle('issue-gift-card', (event, data) => {
+    return new Promise((resolve, reject) => {
+        const now = new Date().toISOString();
+        
+        // 1. If converting points, deduct from the customer first
+        if (data.customerId) {
+            db.run(`UPDATE Customers SET loyalty_balance = loyalty_balance - ? WHERE id = ?`, [data.amount, data.customerId]);
+        }
+        
+        // 2. Create or Add to the Gift Card
+        db.run(`INSERT INTO GiftCards (card_hash, balance, issued_at) VALUES (?, ?, ?)
+                ON CONFLICT(card_hash) DO UPDATE SET balance = balance + ?`,
+            [data.hash, data.amount, now, data.amount],
+            function(err) { if (err) reject(err); else resolve({ success: true }); }
+        );
     });
 });

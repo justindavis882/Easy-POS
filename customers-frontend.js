@@ -100,6 +100,44 @@
         }
     });
 
+    // --- Issue Gift Card Logic ---
+    const issueGcBtn = document.getElementById('issue-gc-btn');
+    if (issueGcBtn) {
+        issueGcBtn.addEventListener('click', async () => {
+            const hash = document.getElementById('new-gc-hash').value;
+            const amount = parseFloat(document.getElementById('new-gc-amount').value);
+            const customerId = document.getElementById('cust-id').value; // Null if new customer
+            const currentBalance = parseFloat(document.getElementById('cust-balance').value);
+
+            if (!hash || isNaN(amount) || amount <= 0) {
+                return alert("Please swipe a card and enter a valid amount.");
+            }
+
+            // If a customer exists, ensure they have enough points to convert!
+            if (customerId && amount > currentBalance) {
+                return alert("Cannot issue gift card: Amount exceeds customer's loyalty balance.");
+            }
+
+            try {
+                await window.api.issueGiftCard(hash, amount, customerId || null);
+                
+                alert(`Successfully loaded $${amount.toFixed(2)} onto Gift Card!`);
+                
+                // Visually deduct it from the modal so the cashier sees the update
+                if (customerId) {
+                    document.getElementById('cust-balance').value = (currentBalance - amount).toFixed(2);
+                }
+                
+                document.getElementById('new-gc-hash').value = '';
+                document.getElementById('new-gc-amount').value = '';
+                
+            } catch (error) {
+                console.error(error);
+                alert("Error issuing Gift Card.");
+            }
+        });
+    }
+    
     document.getElementById('close-customers-btn').addEventListener('click', () => {
         renderHomeDashboard();
     });

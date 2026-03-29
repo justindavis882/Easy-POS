@@ -60,4 +60,8 @@ db.serialize(() => {
 db.run(`ALTER TABLE Tickets ADD COLUMN customer_id INTEGER`, () => {});
 db.run(`ALTER TABLE Tickets ADD COLUMN discount_amount REAL DEFAULT 0`, () => {});
 
+
+db.run(`CREATE TABLE IF NOT EXISTS GiftCards (id INTEGER PRIMARY KEY AUTOINCREMENT, card_hash TEXT UNIQUE, balance REAL DEFAULT 0.00, issued_at TEXT)`);
+db.run(`ALTER TABLE Tickets ADD COLUMN loyalty_redeemed REAL DEFAULT 0`, () => {});
+db.run(`ALTER TABLE Tickets ADD COLUMN gift_card_redeemed REAL DEFAULT 0`, () => {});
 module.exports = db;

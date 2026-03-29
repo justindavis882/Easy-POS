@@ -9,7 +9,33 @@
             <button id="btn-park-ticket" class="action-btn" style="background: #FF9800; padding: 6px 15px; font-size: 0.9rem; margin-left: 20px;">⏸️ Park Order</button>
             <button id="btn-recall-ticket" class="action-btn" style="background: #4A90E2; padding: 6px 15px; font-size: 0.9rem;">📂 Open Tickets <span id="open-ticket-count" style="background: white; color: #4A90E2; padding: 2px 6px; border-radius: 10px; margin-left: 5px; font-weight: bold;">0</span></button>
             <button id="btn-attach-customer" class="action-btn" style="background: #9C27B0; padding: 6px 15px; font-size: 0.9rem; margin-left: 10px;">👤 Attach Customer</button>
+            <button class="action-btn" id="btn-sell-gc" style="background-color: #E91E63;">💳 Sell GC</button>
         </div>
+
+        <div id="attach-customer-modal" class="modal-overlay hidden" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 600px; background: #1e1e1e; border: 1px solid #444;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0; color: #9C27B0;">Attach Customer</h2>
+                <button id="btn-quick-add-cust" class="action-btn save-btn" style="padding: 8px 15px; background: #4CAF50;">+ New Customer</button>
+            </div>
+            <input type="text" id="attach-customer-search" placeholder="Search name, phone, or scan card..." style="width: 100%; padding: 15px; font-size: 1.2rem; background: #2a2a2a; color: white; border: 1px solid #555; margin-bottom: 15px;">
+            
+            <table class="data-table" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left;">Name</th>
+                        <th style="text-align: left;">Phone</th>
+                        <th style="text-align: right;">Balance</th>
+                        <th style="text-align: center;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="attach-customer-results"></tbody>
+            </table>
+            
+            <button id="close-attach-customer-btn" class="action-btn cancel-btn" style="width: 100%; margin-top: 15px;">Cancel</button>
+        </div>
+    </div>
+
         <button id="close-register-btn" class="nav-btn icon-btn">✕ Close</button>
     </header>
 
@@ -30,16 +56,16 @@
                     <button class="pos-btn num-btn">4</button>
                     <button class="pos-btn num-btn">5</button>
                     <button class="pos-btn num-btn">6</button>
-                    <button class="pos-btn action-key" id="btn-void" style="background-color: #E53935;">VOID</button>
+                    <button class="pos-btn action-key" id="btn-no-sale" style="background-color: #9E9E9E;">NO SALE</button>
 
                     <button class="pos-btn num-btn">1</button>
                     <button class="pos-btn num-btn">2</button>
                     <button class="pos-btn num-btn">3</button>
-                    <button class="pos-btn action-key" id="btn-no-sale" style="background-color: #9E9E9E;">NO SALE</button>
+                    <button class="pos-btn action-key" id="btn-void" style="background-color: #E53935;">VOID</button>
 
+                    <button class="pos-btn" id="btn-clear" style="background-color: #333; color: #FFD54F;">C</button>
                     <button class="pos-btn num-btn">0</button>
                     <button class="pos-btn action-key" id="btn-discount" style="background-color: #673AB7;">% DISC</button>
-                    <button class="pos-btn" id="btn-clear" style="background-color: #333; color: #FFD54F;">C</button>
                     <button class="pos-btn action-key" id="manual-add-btn" style="background-color: #4A90E2;">ENTER</button>
                 </div>
             </div>
@@ -72,21 +98,42 @@
                 <button class="tender-btn cash" data-tender="Cash">💵 Cash</button>
                 <button class="tender-btn card" data-tender="External_Card">💳 External Card</button>
                 <button class="tender-btn venmo" data-tender="Venmo">📱 Venmo</button>
+
+                <hr style="border-color: #444; margin: 20px 0;">
+                <p style="color: #aaa; margin-bottom: 10px; font-size: 0.9rem;">SPLIT TENDERS & REWARDS</p>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button id="btn-pay-points" class="action-btn" style="flex: 1; background: #E91E63; display: none;">Pay with Points</button>
+                    <button id="btn-pay-giftcard" class="action-btn" style="flex: 1; background: #9C27B0;">Pay with Gift Card</button>
+                </div>
             </div>
             <button id="cancel-checkout-btn" class="action-btn cancel-btn">Cancel</button>
         </div>
     </div>
 
-    <div id="cash-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h2>Amount Tendered</h2>
-            <h1 id="cash-total-display" style="color: #FFD54F;">Due: $0.00</h1>
-            <div class="form-group">
-                <input type="number" id="cash-amount-input" step="0.01" placeholder="0.00" style="font-size: 3rem; padding: 20px; text-align: center; width: 80%; margin: 20px auto; display: block;">
+    <div id="cash-modal" class="modal-overlay hidden" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 350px; background: #1e1e1e; border: 1px solid #444; text-align: center;">
+            <h2 style="margin-top: 0; color: #4CAF50;">Cash Payment</h2>
+            <p id="cash-total-display" style="font-size: 1.5rem; margin-bottom: 15px;">Due: $0.00</p>
+            <input type="number" id="cash-amount-input" placeholder="Amount Tendered" style="width: 100%; padding: 15px; font-size: 2rem; text-align: center; background: #2a2a2a; color: white; border: 1px solid #555; margin-bottom: 15px;">
+            
+            <div class="pos-keypad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
+                <button class="pos-btn cash-num-btn">1</button>
+                <button class="pos-btn cash-num-btn">2</button>
+                <button class="pos-btn cash-num-btn">3</button>
+                <button class="pos-btn cash-num-btn">4</button>
+                <button class="pos-btn cash-num-btn">5</button>
+                <button class="pos-btn cash-num-btn">6</button>
+                <button class="pos-btn cash-num-btn">7</button>
+                <button class="pos-btn cash-num-btn">8</button>
+                <button class="pos-btn cash-num-btn">9</button>
+                <button class="pos-btn cash-num-btn" id="cash-btn-exact" style="background-color: #4CAF50; font-size: 1.2rem;">Exact</button>
+                <button class="pos-btn cash-num-btn">0</button>
+                <button class="pos-btn cash-btn-clear" style="background-color: #E53935;">C</button>
             </div>
-            <div class="modal-actions" style="justify-content: center;">
-                <button id="cancel-cash-btn" class="action-btn cancel-btn" style="flex: unset; padding: 20px 40px;">Back</button>
-                <button id="confirm-cash-btn" class="action-btn save-btn" style="flex: unset; padding: 20px 40px;">Pay & Calculate</button>
+
+            <div style="display: flex; gap: 10px;">
+                <button id="cancel-cash-btn" class="action-btn cancel-btn" style="flex: 1;">Cancel</button>
+                <button id="confirm-cash-btn" class="action-btn save-btn" style="flex: 1;">Confirm</button>
             </div>
         </div>
     </div>
@@ -189,15 +236,6 @@
             </table>
         </div>
 
-        <div id="attach-customer-modal" class="modal-overlay hidden" style="z-index: 2000;">
-            <div class="modal-content" style="max-width: 500px; background: #1e1e1e; border: 1px solid #444;">
-                <h2 style="margin-top: 0; color: #9C27B0;">Attach Customer</h2>
-                <input type="text" id="attach-customer-search" placeholder="Search name, phone, or scan card..." style="width: 100%; padding: 15px; font-size: 1.2rem; background: #2a2a2a; color: white; border: 1px solid #555; margin-bottom: 15px;">
-                <ul id="attach-customer-results" class="settings-list" style="max-height: 250px; overflow-y: auto;"></ul>
-                <button id="close-attach-customer-btn" class="action-btn cancel-btn" style="width: 100%; margin-top: 15px;">Cancel</button>
-            </div>
-        </div>
-
         <div id="discount-modal" class="modal-overlay hidden" style="z-index: 2000;">
             <div class="modal-content" style="max-width: 300px; background: #1e1e1e; border: 1px solid #444; text-align: center;">
                 <h2 style="margin-top: 0; color: #673AB7;">Apply Discount</h2>
@@ -210,3 +248,46 @@
             </div>
         </div>
     </div>
+
+    <div id="gc-checkout-modal" class="modal-overlay hidden" style="z-index: 2500;">
+        <div class="modal-content" style="max-width: 400px; background: #1e1e1e; border: 1px solid #444; text-align: center;">
+            <h2 style="margin-top: 0; color: #9C27B0;">Gift Card Payment</h2>
+            <p id="gc-remaining-display" style="font-size: 1.5rem; color: #4CAF50; font-weight: bold; margin-bottom: 20px;">Remaining Due: $0.00</p>
+            
+            <input type="text" id="gc-swipe-input" placeholder="Swipe or Enter Gift Card..." style="width: 100%; padding: 15px; font-size: 1.2rem; background: #2a2a2a; color: white; border: 1px solid #555; margin-bottom: 15px;">
+            
+            <div style="display: flex; gap: 10px;">
+                <button id="cancel-gc-pay-btn" class="action-btn cancel-btn" style="flex: 1;">Cancel</button>
+                <button id="apply-gc-pay-btn" class="action-btn save-btn" style="flex: 1; background: #9C27B0;">Apply Card</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="quick-add-modal" class="modal-overlay hidden" style="z-index: 2100;">
+        <div class="modal-content" style="max-width: 400px; background: #1e1e1e; border: 1px solid #444;">
+            <h2 style="margin-top: 0; color: #4CAF50;">Quick Add Customer</h2>
+            <input type="text" id="qa-first" placeholder="First Name" style="width: 100%; padding: 10px; margin-bottom: 10px; background: #2a2a2a; color: white; border: 1px solid #555;">
+            <input type="text" id="qa-last" placeholder="Last Name" style="width: 100%; padding: 10px; margin-bottom: 10px; background: #2a2a2a; color: white; border: 1px solid #555;">
+            <input type="tel" id="qa-phone" placeholder="Phone Number" style="width: 100%; padding: 10px; margin-bottom: 15px; background: #2a2a2a; color: white; border: 1px solid #555;">
+            
+            <div style="display: flex; gap: 10px;">
+                <button id="cancel-qa-btn" class="action-btn cancel-btn" style="flex: 1;">Cancel</button>
+                <button id="save-qa-btn" class="action-btn save-btn" style="flex: 1;">Save & Attach</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="sell-gc-modal" class="modal-overlay hidden" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 350px; background: #1e1e1e; border: 1px solid #444; text-align: center;">
+            <h2 style="margin-top: 0; color: #E91E63;">Load Gift Card</h2>
+            <input type="text" id="sell-gc-hash" placeholder="Swipe Card..." style="width: 100%; padding: 15px; font-size: 1.2rem; background: #2a2a2a; color: white; border: 1px solid #555; margin-bottom: 10px;">
+            <input type="number" id="sell-gc-amount" placeholder="Amount ($)" style="width: 100%; padding: 15px; font-size: 1.2rem; background: #2a2a2a; color: white; border: 1px solid #555; margin-bottom: 15px;">
+            
+            <div style="display: flex; gap: 10px;">
+                <button id="cancel-sell-gc-btn" class="action-btn cancel-btn" style="flex: 1;">Cancel</button>
+                <button id="confirm-sell-gc-btn" class="action-btn save-btn" style="flex: 1; background: #E91E63;">Add to Cart</button>
+            </div>
+        </div>
+    </div>
+
+</div>
