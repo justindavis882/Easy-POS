@@ -1,0 +1,76 @@
+<div id="settings-applet" class="applet-full-container" style="background-color: #1e1e1e; display: flex; flex-direction: column;">
+    <header class="register-header" style="background-color: #2a2a2a; border-bottom: 2px solid #333;">
+        <h2>System Settings</h2>
+        <button id="close-settings-btn" class="nav-btn icon-btn">✕ Close</button>
+    </header>
+
+    <div style="display: flex; flex-grow: 1; overflow: hidden;">
+        <aside style="width: 250px; background-color: #2a2a2a; border-right: 2px solid #333;">
+            <ul id="settings-tabs" style="list-style: none; padding: 0; margin: 0;">
+                <li class="tab-btn active" data-target="tab-global">🌍 Global / OS</li>
+                <li class="tab-btn" data-target="tab-register">🛒 Register</li>
+                <li class="tab-btn" data-target="tab-inventory">📦 Inventory</li>
+                <li class="tab-btn" data-target="tab-users">👥 Users & Shifts</li>
+            </ul>
+        </aside>
+
+        <main style="flex-grow: 1; padding: 40px; overflow-y: auto; background-color: #121212;">
+            
+            <div id="tab-global" class="settings-pane active">
+                <h3>Home Screen Applets</h3>
+                <ul id="list-global" class="settings-list"></ul>
+                
+                <hr style="border-color: #333; margin: 30px 0;">
+                
+                <h3>Loyalty Program</h3>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <input type="number" id="loyalty-input" step="0.01" style="padding: 10px; font-size: 1.2rem; background: #333; color: white; border: 1px solid #444; border-radius: 4px;">
+                    <button id="save-loyalty-btn" class="action-btn" style="background-color: #4CAF50;">SAVE</button>
+                </div>
+            </div>
+
+            <div id="tab-register" class="settings-pane hidden">
+                <h3>Register Features</h3>
+                <ul id="list-register" class="settings-list"></ul>
+            </div>
+
+            <div id="tab-inventory" class="settings-pane hidden">
+                <h3>Inventory Controls</h3>
+                <ul id="list-inventory" class="settings-list"></ul>
+            </div>
+
+            <div id="tab-users" class="settings-pane hidden">
+                <h3>Timeclock & Shifts</h3>
+                <ul id="list-users" class="settings-list"></ul>
+                
+                <hr style="border-color: #333; margin: 30px 0;">
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>Employee Management</h3>
+                    <button id="show-add-user-btn" class="action-btn" style="background-color: #4A90E2; padding: 10px 20px;">+ Add Employee</button>
+                </div>
+
+                <div id="add-user-form-container" class="hidden" style="background: #2a2a2a; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <form id="add-user-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div><label>First Name</label><input type="text" id="new-user-first" required style="width: 100%; padding: 8px;"></div>
+                        <div><label>Last Name</label><input type="text" id="new-user-last" required style="width: 100%; padding: 8px;"></div>
+                        <div><label>Role</label><select id="new-user-role" required style="width: 100%; padding: 8px;"></select></div>
+                        <div><label>Login PIN (4-6 digits)</label><input type="text" id="new-user-pin" required style="width: 100%; padding: 8px;"></div>
+                        <div style="grid-column: span 2;">
+                            <label>MSR Swipe Hash (Optional)</label>
+                            <input type="text" id="new-user-msr" placeholder="Swipe card here..." style="width: 100%; padding: 8px;">
+                        </div>
+                        <button type="button" id="cancel-user-btn" class="action-btn cancel-btn">Cancel</button>
+                        <button type="submit" class="action-btn save-btn">Save Employee</button>
+                    </form>
+                </div>
+
+                <table class="data-table" style="margin-top: 20px;">
+                    <thead><tr><th>Name</th><th>Role</th><th>PIN</th><th>Status</th></tr></thead>
+                    <tbody id="users-table-body"></tbody>
+                </table>
+            </div>
+
+        </main>
+    </div>
+</div>

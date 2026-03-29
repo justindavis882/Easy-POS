@@ -1,0 +1,190 @@
+<div id="register-applet" class="applet-full-container">
+    <header class="register-header">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <h2>Active Ticket</h2>
+            <span style="background: #121212; border: 1px solid #444; padding: 6px 12px; border-radius: 8px; font-size: 0.9rem; color: #aaa;">
+                👤 Cashier: <strong id="current-cashier-name" style="color: #4A90E2;">System</strong>
+            </span>
+            
+            <button id="btn-park-ticket" class="action-btn" style="background: #FF9800; padding: 6px 15px; font-size: 0.9rem; margin-left: 20px;">⏸️ Park Order</button>
+            <button id="btn-recall-ticket" class="action-btn" style="background: #4A90E2; padding: 6px 15px; font-size: 0.9rem;">📂 Open Tickets <span id="open-ticket-count" style="background: white; color: #4A90E2; padding: 2px 6px; border-radius: 10px; margin-left: 5px; font-weight: bold;">0</span></button>
+        </div>
+        <button id="close-register-btn" class="nav-btn icon-btn">✕ Close</button>
+    </header>
+
+    <main class="register-layout">
+        <section class="register-left">
+            <div class="manual-entry-card">
+                <h3 style="margin-top: 0;">Item Entry</h3>
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <input type="text" id="manual-barcode-input" placeholder="Scan or enter SKU...">
+                </div>
+                
+                <div class="pos-keypad" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                    <button class="pos-btn num-btn">7</button>
+                    <button class="pos-btn num-btn">8</button>
+                    <button class="pos-btn num-btn">9</button>
+                    <button class="pos-btn action-key" id="btn-qty" style="background-color: #FFD54F; color: #121212;">QTY</button>
+
+                    <button class="pos-btn num-btn">4</button>
+                    <button class="pos-btn num-btn">5</button>
+                    <button class="pos-btn num-btn">6</button>
+                    <button class="pos-btn action-key" id="btn-void" style="background-color: #E53935;">VOID</button>
+
+                    <button class="pos-btn num-btn">1</button>
+                    <button class="pos-btn num-btn">2</button>
+                    <button class="pos-btn num-btn">3</button>
+                    <button class="pos-btn action-key" id="btn-no-sale" style="background-color: #9E9E9E;">NO SALE</button>
+
+                    <button class="pos-btn num-btn">0</button>
+                    <button class="pos-btn num-btn">00</button>
+                    <button class="pos-btn" id="btn-clear" style="background-color: #333; color: #FFD54F;">C</button>
+                    <button class="pos-btn action-key" id="manual-add-btn" style="background-color: #4A90E2;">ENTER</button>
+                </div>
+            </div>
+            <div class="scan-feedback">
+                <p id="last-scanned-msg">Ready for next item...</p>
+            </div>
+        </section>
+
+        <section class="register-right">
+            <div class="cart-container">
+                <ul id="cart-items-list" class="cart-list">
+                    </ul>
+            </div>
+            
+            <div class="cart-totals">
+                <div class="tot-row"><span>Subtotal:</span> <span id="cart-subtotal">$0.00</span></div>
+                <div class="tot-row"><span>Tax (7%):</span> <span id="cart-tax">$0.00</span></div>
+                <div class="tot-row grand-total"><span>Total:</span> <span id="cart-total">$0.00</span></div>
+            </div>
+
+            <button id="checkout-btn" class="checkout-btn" disabled>CHECKOUT</button>
+        </section>
+    </main>
+
+    <div id="checkout-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2>Select Tender</h2>
+            <h1 id="modal-total-display">$0.00</h1>
+            <div class="tender-grid">
+                <button class="tender-btn cash" data-tender="Cash">💵 Cash</button>
+                <button class="tender-btn card" data-tender="External_Card">💳 External Card</button>
+                <button class="tender-btn venmo" data-tender="Venmo">📱 Venmo</button>
+            </div>
+            <button id="cancel-checkout-btn" class="action-btn cancel-btn">Cancel</button>
+        </div>
+    </div>
+
+    <div id="cash-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2>Amount Tendered</h2>
+            <h1 id="cash-total-display" style="color: #FFD54F;">Due: $0.00</h1>
+            <div class="form-group">
+                <input type="number" id="cash-amount-input" step="0.01" placeholder="0.00" style="font-size: 3rem; padding: 20px; text-align: center; width: 80%; margin: 20px auto; display: block;">
+            </div>
+            <div class="modal-actions" style="justify-content: center;">
+                <button id="cancel-cash-btn" class="action-btn cancel-btn" style="flex: unset; padding: 20px 40px;">Back</button>
+                <button id="confirm-cash-btn" class="action-btn save-btn" style="flex: unset; padding: 20px 40px;">Pay & Calculate</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="change-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="border: 4px solid #4CAF50;">
+            <h2 style="color: #4CAF50; font-size: 2.5rem;">✅ SALE COMPLETE</h2>
+            <h1 style="font-size: 4rem; margin: 40px 0;">Give Change: <br><span id="change-due-display" style="color: #FFF;">$0.00</span></h1>
+            <button id="close-change-btn" class="action-btn save-btn" style="width: 100%; padding: 25px; font-size: 2rem;">Done (Next Customer)</button>
+        </div>
+    </div>
+</div>
+
+<div id="receipt-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 400px; background: #fff; color: #000; font-family: 'Courier New', Courier, monospace; text-align: left; padding: 20px; border-radius: 0;">
+            
+            <div id="printable-receipt-area">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0; font-size: 1.8rem;">EASY POS</h2>
+                    <p style="margin: 0; font-size: 0.9rem;">123 Main Street<br>Madison, IN 47250</p>
+                </div>
+                
+                <div style="border-bottom: 1px dashed #000; margin-bottom: 10px; padding-bottom: 10px; font-size: 0.9rem;">
+                    <span id="receipt-date"></span><br>
+                    Ticket: #<span id="receipt-ticket-id"></span><br>
+                    Cashier: <span id="receipt-cashier-name">System</span>
+                </div>
+                
+                <table style="width: 100%; font-size: 0.9rem; margin-bottom: 10px; border-collapse: collapse;">
+                    <tbody id="receipt-items">
+                        </tbody>
+                </table>
+                
+                <div style="border-top: 1px dashed #000; padding-top: 10px; font-size: 0.9rem;">
+                    <div style="display: flex; justify-content: space-between;"><span>Subtotal:</span> <span id="receipt-subtotal"></span></div>
+                    <div style="display: flex; justify-content: space-between;"><span>Tax (7%):</span> <span id="receipt-tax"></span></div>
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1rem; margin-top: 5px;"><span>Total:</span> <span id="receipt-total"></span></div>
+                </div>
+                
+                <div style="border-top: 1px dashed #000; margin-top: 10px; padding-top: 10px; font-size: 0.9rem;">
+                    <div style="display: flex; justify-content: space-between;"><span>Tender (<span id="receipt-tender-type"></span>):</span> <span id="receipt-tender-amount"></span></div>
+                    <div style="display: flex; justify-content: space-between;"><span>Change Due:</span> <span id="receipt-change-due"></span></div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 20px; font-size: 0.8rem;">
+                    Thank you for your business!
+                </div>
+            </div>
+
+            <div class="modal-actions" style="margin-top: 30px; display: flex; gap: 10px;">
+                <button id="print-receipt-btn" class="action-btn" style="flex: 1; background: #4A90E2; padding: 15px; font-size: 1.2rem;">🖨️ Print Receipt</button>
+                <button id="close-receipt-btn" class="action-btn" style="flex: 1; background: #E53935; padding: 15px; font-size: 1.2rem;">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="override-modal" class="modal-overlay hidden" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 400px; background: #1e1e1e; border: 2px solid #E53935;">
+            <h2 style="color: #E53935; margin-top: 0;">Manager Override</h2>
+            <p id="override-msg" style="color: #aaa; margin-bottom: 20px;">Enter Manager PIN or Swipe Card</p>
+
+            <div id="override-pin-display" style="font-size: 2.5rem; letter-spacing: 15px; height: 40px; margin-bottom: 20px; color: #FFD54F;"></div>
+
+            <div class="pin-pad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                <button class="override-pin-btn pos-btn">1</button>
+                <button class="override-pin-btn pos-btn">2</button>
+                <button class="override-pin-btn pos-btn">3</button>
+                <button class="override-pin-btn pos-btn">4</button>
+                <button class="override-pin-btn pos-btn">5</button>
+                <button class="override-pin-btn pos-btn">6</button>
+                <button class="override-pin-btn pos-btn">7</button>
+                <button class="override-pin-btn pos-btn">8</button>
+                <button class="override-pin-btn pos-btn">9</button>
+                <button id="override-pin-clear" class="pos-btn" style="background-color: #E53935; color: white;">C</button>
+                <button class="override-pin-btn pos-btn">0</button>
+                <button id="override-pin-enter" class="pos-btn" style="background-color: #4CAF50; color: white;">↵</button>
+            </div>
+            <button id="cancel-override-btn" class="action-btn" style="width: 100%; margin-top: 20px; background: #333;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="recall-modal" class="modal-overlay hidden" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 600px; background: #1e1e1e; border: 1px solid #444;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px;">
+                <h2 style="margin: 0; color: #fff;">Open Tickets</h2>
+                <button id="close-recall-btn" class="nav-btn icon-btn" style="background: #333; padding: 5px 10px;">✕</button>
+            </div>
+            
+            <table class="data-table" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left;">Time Parked</th>
+                        <th style="text-align: left;">Items</th>
+                        <th style="text-align: left;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="recall-table-body">
+                    </tbody>
+            </table>
+        </div>
+    </div>

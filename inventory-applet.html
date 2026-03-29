@@ -1,0 +1,81 @@
+<div id="inventory-applet" class="applet-full-container">
+    <header class="register-header">
+        <h2>Inventory Management</h2>
+        <div class="header-actions">
+            <button id="btn-add-item" class="action-btn">➕ New Item</button>
+            <button id="close-inventory-btn" class="nav-btn icon-btn">✕ Close</button>
+        </div>
+    </header>
+
+    <main class="inventory-layout">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>SKU / Barcode</th>
+                    <th>Item Name</th>
+                    <th>Price</th>
+                    <th>In Stock</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="inventory-table-body">
+                </tbody>
+        </table>
+    </main>
+
+    <div id="item-modal" class="modal-overlay hidden">
+        <div class="modal-content form-modal">
+            <h2 id="item-modal-title">Add New Item</h2>
+            <form id="item-form">
+                <input type="hidden" id="form-item-id">
+                <div class="form-group">
+                    <label>Item Name</label>
+                    <input type="text" id="form-item-name" required>
+                </div>
+                <div class="form-group">
+                    <label>SKU / Barcode</label>
+                    <input type="text" id="form-item-sku" required>
+                </div>
+                <div class="form-group form-row">
+                    <div>
+                        <label>Price ($)</label>
+                        <input type="number" step="0.01" id="form-item-price" required>
+                    </div>
+                    <div>
+                        <label>Initial Stock</label>
+                        <input type="number" id="form-item-stock">
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="action-btn cancel-btn" onclick="closeModals()">Cancel</button>
+                    <button type="submit" class="action-btn save-btn">Save Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="stock-modal" class="modal-overlay hidden">
+        <div class="modal-content form-modal">
+            <h2>Adjust Stock: <span id="adjust-item-name"></span></h2>
+            <form id="stock-form">
+                <input type="hidden" id="adjust-item-id">
+                <div class="form-group">
+                    <label>Adjustment Type</label>
+                    <select id="adjust-reason" required>
+                        <option value="Vendor Receive">Receive Vendor Order (+)</option>
+                        <option value="Manual Audit">Manual Audit Count (+/-)</option>
+                        <option value="Damaged">Mark as Damaged (-)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quantity Change (Use negative numbers for loss)</label>
+                    <input type="number" id="adjust-amount" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="action-btn cancel-btn" onclick="closeModals()">Cancel</button>
+                    <button type="submit" class="action-btn save-btn">Update Stock</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
