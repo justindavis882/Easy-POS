@@ -114,6 +114,11 @@
         stockModal.classList.add('hidden');
     };
 
+    // Close the Inventory Applet
+    document.getElementById('close-inventory-btn').addEventListener('click', () => {
+        renderHomeDashboard();
+    });
+    
     // Boot
     loadInventory();
 })();

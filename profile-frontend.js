@@ -29,3 +29,8 @@ clockBtn.addEventListener('click', async () => {
         alert("System error. Please notify a manager.");
     }
 });
+
+// Close the Profile Applet
+    document.getElementById('close-profile-btn').addEventListener('click', () => {
+        renderHomeDashboard();
+    });

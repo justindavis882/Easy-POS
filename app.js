@@ -50,8 +50,11 @@ let activeInput = null;
 // --- 3. APPLET INJECTION LOGIC ---
 // ==========================================
 async function loadAppletView(appletId) {
-    // CLEANUP: Prevent Detached Focus AND wipe OSK memory
-    if (document.activeElement) document.activeElement.blur();
+    // 1. CLEANUP: Prevent the Chromium Focus Drop Bug!
+    // Force the browser to look at the permanent background before destroying the applet
+    document.body.tabIndex = -1; 
+    document.body.focus();
+    
     const osk = document.getElementById('virtual-keyboard');
     if (osk) osk.classList.add('osk-hidden');
     if (typeof activeInput !== 'undefined') activeInput = null;
@@ -91,8 +94,10 @@ async function renderHomeDashboard() {
     }
 
     try {
-        // CLEANUP: Prevent Detached Focus AND wipe OSK memory
-        if (document.activeElement) document.activeElement.blur(); 
+        // 1. CLEANUP: Prevent the Chromium Focus Drop Bug!
+        document.body.tabIndex = -1; 
+        document.body.focus();
+        
         const osk = document.getElementById('virtual-keyboard');
         if (osk) osk.classList.add('osk-hidden'); 
         if (typeof activeInput !== 'undefined') activeInput = null;

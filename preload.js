@@ -31,4 +31,5 @@ contextBridge.exposeInMainWorld('api', {
     getCustomers: () => ipcRenderer.invoke('get-customers'),
     saveCustomer: (customerData) => ipcRenderer.invoke('save-customer', customerData),
     deleteCustomer: (customerId) => ipcRenderer.invoke('delete-customer', customerId),
+    searchCustomers: (searchTerm) => ipcRenderer.invoke('search-customers', searchTerm),
 });

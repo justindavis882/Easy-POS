@@ -1,5 +1,11 @@
 // register-frontend.js
 (() => {
+    window.globalActiveCustomer = window.globalActiveCustomer || null;
+    window.globalActiveDiscount = window.globalActiveDiscount || 0;
+    
+    let currentCustomer = window.globalActiveCustomer;
+    let currentDiscountPercent = window.globalActiveDiscount;
+
     // --- Set Active Cashier ---
     const cashierNameEl = document.getElementById('current-cashier-name');
     let activeUserId = 1; // Fallback just in case
@@ -38,6 +44,12 @@
     const overrideModal = document.getElementById('override-modal');
 
     const handleKeydown = (e) => {
+        // SELF-CLEANING: If the register was closed, destroy this listener!
+        if (!document.getElementById('register-applet')) {
+            document.removeEventListener('keydown', handleKeydown);
+            return;
+        }
+        
         const currentTime = Date.now();
         if (currentTime - lastKeyTime > 50) barcodeBuffer = ""; 
         
@@ -554,6 +566,7 @@
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
             document.removeEventListener('keydown', handleKeydown);
+            renderHomeDashboard();
         });
     }
 
@@ -585,6 +598,86 @@
         }
     });
 
+    // --- Customer Attachment Logic ---
+    const attachBtn = document.getElementById('btn-attach-customer');
+    const attachModal = document.getElementById('attach-customer-modal');
+    const searchInput = document.getElementById('attach-customer-search');
+    const resultsList = document.getElementById('attach-customer-results');
+
+    function updateCustomerUI() {
+        if (currentCustomer) {
+            attachBtn.innerHTML = `👤 ${currentCustomer.first_name} ($${currentCustomer.loyalty_balance.toFixed(2)}) <span id="remove-customer" style="color: #ff4444; margin-left: 8px;">✕</span>`;
+            document.getElementById('remove-customer').addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent opening modal
+                currentCustomer = null;
+                window.globalActiveCustomer = null;
+                updateCustomerUI();
+            });
+        } else {
+            attachBtn.innerHTML = `👤 Attach Customer`;
+        }
+    }
+
+    if (attachBtn) {
+        attachBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            resultsList.innerHTML = '';
+            attachModal.classList.remove('hidden');
+            setTimeout(() => {
+                searchInput.focus();
+             }, 10); // Focus after modal animation
+        });
+    }
+
+    document.getElementById('close-attach-customer-btn').addEventListener('click', () => attachModal.classList.add('hidden'));
+
+    searchInput.addEventListener('input', async (e) => {
+        const term = e.target.value;
+        if (term.length < 2) return;
+        
+        const results = await window.api.searchCustomers(term);
+        resultsList.innerHTML = '';
+        
+        results.forEach(cust => {
+            const li = document.createElement('li');
+            li.style.cursor = 'pointer';
+            li.innerHTML = `<strong>${cust.first_name} ${cust.last_name}</strong> - ${cust.phone || 'No Phone'} <span style="float: right; color: #4CAF50;">$${cust.loyalty_balance.toFixed(2)}</span>`;
+            li.addEventListener('click', () => {
+                currentCustomer = cust;
+                window.globalActiveCustomer = cust;
+                updateCustomerUI();
+                attachModal.classList.add('hidden');
+            });
+            resultsList.appendChild(li);
+        });
+    });
+
+    // --- Discount Logic ---
+    document.getElementById('btn-discount').addEventListener('click', () => {
+        document.getElementById('discount-input').value = '';
+        document.getElementById('discount-modal').classList.remove('hidden');
+        
+        // FIX: Give Chromium 10ms to paint the modal before focusing!
+        setTimeout(() => {
+            document.getElementById('discount-input').focus();
+        }, 10);
+    });
+
+    document.getElementById('cancel-discount-btn').addEventListener('click', () => {
+        document.getElementById('discount-modal').classList.add('hidden');
+    });
+
+    document.getElementById('apply-discount-btn').addEventListener('click', () => {
+        const val = parseFloat(document.getElementById('discount-input').value);
+        if (!isNaN(val) && val > 0 && val <= 100) {
+            currentDiscountPercent = val;
+            window.globalActiveDiscount = val;
+            updateCartUI();
+        }
+        document.getElementById('discount-modal').classList.add('hidden');
+    });
+
+    //Finally, run the initial UI update to set everything in the correct state on load
     updateCartUI();
     updateTicketCount();
 })();

@@ -8,6 +8,7 @@
             
             <button id="btn-park-ticket" class="action-btn" style="background: #FF9800; padding: 6px 15px; font-size: 0.9rem; margin-left: 20px;">⏸️ Park Order</button>
             <button id="btn-recall-ticket" class="action-btn" style="background: #4A90E2; padding: 6px 15px; font-size: 0.9rem;">📂 Open Tickets <span id="open-ticket-count" style="background: white; color: #4A90E2; padding: 2px 6px; border-radius: 10px; margin-left: 5px; font-weight: bold;">0</span></button>
+            <button id="btn-attach-customer" class="action-btn" style="background: #9C27B0; padding: 6px 15px; font-size: 0.9rem; margin-left: 10px;">👤 Attach Customer</button>
         </div>
         <button id="close-register-btn" class="nav-btn icon-btn">✕ Close</button>
     </header>
@@ -37,7 +38,7 @@
                     <button class="pos-btn action-key" id="btn-no-sale" style="background-color: #9E9E9E;">NO SALE</button>
 
                     <button class="pos-btn num-btn">0</button>
-                    <button class="pos-btn num-btn">00</button>
+                    <button class="pos-btn action-key" id="btn-discount" style="background-color: #673AB7;">% DISC</button>
                     <button class="pos-btn" id="btn-clear" style="background-color: #333; color: #FFD54F;">C</button>
                     <button class="pos-btn action-key" id="manual-add-btn" style="background-color: #4A90E2;">ENTER</button>
                 </div>
@@ -186,5 +187,26 @@
                 <tbody id="recall-table-body">
                     </tbody>
             </table>
+        </div>
+
+        <div id="attach-customer-modal" class="modal-overlay hidden" style="z-index: 2000;">
+            <div class="modal-content" style="max-width: 500px; background: #1e1e1e; border: 1px solid #444;">
+                <h2 style="margin-top: 0; color: #9C27B0;">Attach Customer</h2>
+                <input type="text" id="attach-customer-search" placeholder="Search name, phone, or scan card..." style="width: 100%; padding: 15px; font-size: 1.2rem; background: #2a2a2a; color: white; border: 1px solid #555; margin-bottom: 15px;">
+                <ul id="attach-customer-results" class="settings-list" style="max-height: 250px; overflow-y: auto;"></ul>
+                <button id="close-attach-customer-btn" class="action-btn cancel-btn" style="width: 100%; margin-top: 15px;">Cancel</button>
+            </div>
+        </div>
+
+        <div id="discount-modal" class="modal-overlay hidden" style="z-index: 2000;">
+            <div class="modal-content" style="max-width: 300px; background: #1e1e1e; border: 1px solid #444; text-align: center;">
+                <h2 style="margin-top: 0; color: #673AB7;">Apply Discount</h2>
+                <p>Enter percentage off (e.g., 10 for 10%)</p>
+                <input type="number" id="discount-input" style="width: 100%; padding: 15px; font-size: 2rem; text-align: center; background: #2a2a2a; color: white; border: 1px solid #555; margin-bottom: 15px;">
+                <div style="display: flex; gap: 10px;">
+                    <button id="cancel-discount-btn" class="action-btn cancel-btn" style="flex: 1;">Cancel</button>
+                    <button id="apply-discount-btn" class="action-btn save-btn" style="flex: 1; background: #673AB7;">Apply</button>
+                </div>
+            </div>
         </div>
     </div>

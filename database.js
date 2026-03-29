@@ -55,4 +55,9 @@ db.serialize(() => {
     });
 });
 
+// --- DATABASE MIGRATIONS (Safe Updates) ---
+// These will add the columns if they don't exist, and silently fail if they already do.
+db.run(`ALTER TABLE Tickets ADD COLUMN customer_id INTEGER`, () => {});
+db.run(`ALTER TABLE Tickets ADD COLUMN discount_amount REAL DEFAULT 0`, () => {});
+
 module.exports = db;

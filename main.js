@@ -146,16 +146,22 @@ ipcMain.handle('log-inventory', (event, log) => {
 // --- CHECKOUT API HANDLER ---
 ipcMain.handle('process-checkout', (event, orderData) => {
     return new Promise((resolve, reject) => {
-        const now = new Date().toISOString();
+        const timestamp = new Date().toISOString();
         
-        // 1. Create the Master Ticket
+        // 1. Insert the Ticket
         db.run(
-            `INSERT INTO Tickets (user_id, subtotal, tax, total, tender_type, amount_tendered, change_due, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [orderData.userId, orderData.subtotal, orderData.tax, orderData.total, orderData.tenderType, orderData.amountTendered, orderData.changeDue, now],
+            `INSERT INTO Tickets (user_id, customer_id, subtotal, discount_amount, tax, total, tender_type, amount_tendered, change_due, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [orderData.userId, orderData.customerId || null, orderData.subtotal, orderData.discountAmount || 0, orderData.tax, orderData.total, orderData.tenderType, orderData.amountTendered, orderData.changeDue, timestamp],
             function(err) {
                 if (err) return reject(err);
                 
                 const ticketId = this.lastID;
+                
+                // 2. Handle Loyalty Points if a customer is attached
+                if (orderData.customerId && orderData.loyaltyEarned) {
+                    db.run(`UPDATE Customers SET loyalty_balance = loyalty_balance + ? WHERE id = ?`, 
+                        [orderData.loyaltyEarned, orderData.customerId]);
+                }
                 let itemsProcessed = 0;
                 
                 // 2. Save the items and deduct inventory
@@ -315,6 +321,16 @@ ipcMain.handle('delete-customer', (event, id) => {
     return new Promise((resolve, reject) => {
         db.run(`DELETE FROM Customers WHERE id = ?`, [id], function(err) {
             if (err) reject(err); else resolve({ success: true });
+        });
+    });
+});
+
+ipcMain.handle('search-customers', (event, term) => {
+    return new Promise((resolve, reject) => {
+        const query = `SELECT * FROM Customers WHERE first_name LIKE ? OR last_name LIKE ? OR phone LIKE ? OR loyalty_card_hash = ? LIMIT 10`;
+        const wildTerm = `%${term}%`;
+        db.all(query, [wildTerm, wildTerm, wildTerm, term], (err, rows) => {
+            if (err) reject(err); else resolve(rows);
         });
     });
 });
